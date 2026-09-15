@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "redis.fullname" . }}-test-connection"
+  labels:
+    {{- include "redis.labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: redis-cli
+      image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+      command: ['sh', '-c']
+      args:
+        - >-
+          /redis/src/redis-cli --tls --cacert /redis/tls/ca.crt
+          -h {{ include "redis.fullname" . }} -p {{ .Values.service.port }}
+          -a "$REDIS_PASSWORD" ping
+      env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "redis.secretName" . }}
+              key: REDIS_PASSWORD
+  restartPolicy: Never

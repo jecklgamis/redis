@@ -1,0 +1,12 @@
+1. Redis is TLS-only (self-signed cert baked into the image) and requires
+   the REDIS_PASSWORD set in this release's Secret (default "changeme" -
+   override redisPassword or existingSecretName before using this for
+   anything beyond a quick trial).
+
+2. Connect from inside the cluster:
+   {{ include "redis.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
+
+3. To connect from your machine:
+   export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "redis.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+   kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 6379:6379
+   kubectl --namespace {{ .Release.Namespace }} exec -it $POD_NAME -- /redis/src/redis-cli --tls --cacert /redis/tls/ca.crt -p 6379 -a <password> ping
