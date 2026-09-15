@@ -42,9 +42,43 @@ See the [`Makefile`](Makefile) for other targets (`image`, `run`, `run-bash`).
 A Helm chart is available under [`deployment/k8s/helm/chart`](deployment/k8s/helm/chart) for a single-instance
 deployment with persistence, a Secret for `REDIS_PASSWORD`, and a ClusterIP service.
 
+Generate a random password and store it as a Secret directly (keeps it out of `values.yaml`, shell history via
+`--set`, and Helm's own release values):
+
 ```bash
-cd deployment/k8s/helm
-make install
+kubectl create namespace redis
+REDIS_PASSWORD=$(openssl rand -base64 24)
+kubectl create secret generic redis-credentials -n redis --from-literal=REDIS_PASSWORD="$REDIS_PASSWORD"
 ```
 
-See [`deployment/k8s/helm/chart/values.yaml`](deployment/k8s/helm/chart/values.yaml) for configurable options.
+Install the chart, pointing it at that Secret:
+
+```bash
+cd deployment/k8s/helm/chart
+helm install redis . -n redis --set existingSecretName=redis-credentials --wait
+```
+
+See [`deployment/k8s/helm/chart/values.yaml`](deployment/k8s/helm/chart/values.yaml) for other configurable options.
+
+### Retrieving the password later
+
+```bash
+kubectl get secret redis-credentials -n redis -o jsonpath='{.data.REDIS_PASSWORD}' | base64 -d
+```
+
+### Getting the TLS CA cert
+
+The self-signed CA cert is baked into the image at `/redis/tls/ca.crt` (same cert across pod restarts - it's part
+of the image, not regenerated per-pod; a new one is only generated when the image itself is rebuilt). Pull it out
+of a running pod:
+
+```bash
+POD_NAME=$(kubectl get pods -n redis -l "app.kubernetes.io/name=redis,app.kubernetes.io/instance=redis" -o jsonpath="{.items[0].metadata.name}")
+kubectl exec -n redis $POD_NAME -- cat /redis/tls/ca.crt > ca.crt
+```
+
+Then connect from any client:
+
+```bash
+redis-cli --tls --cacert ca.crt -h <host> -p 6379 -a "$REDIS_PASSWORD" ping
+```
