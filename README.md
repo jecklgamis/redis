@@ -82,3 +82,17 @@ Then connect from any client:
 ```bash
 redis-cli --tls --cacert ca.crt -h <host> -p 6379 -a "$REDIS_PASSWORD" ping
 ```
+
+### Accessing it locally
+
+The Service is `ClusterIP` (internal-only), so from your machine you need to port-forward. In one terminal:
+
+```bash
+kubectl port-forward -n redis svc/redis 6379:6379
+```
+
+In another, connect using the CA cert and password from above:
+
+```bash
+redis-cli --tls --cacert ca.crt -h 127.0.0.1 -p 6379 -a "$REDIS_PASSWORD" ping
+```
